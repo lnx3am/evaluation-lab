@@ -122,8 +122,14 @@ def main() -> None:
             parser.error(f"invalid prediction at line {line_number}: "
                          f"latency_ms must be a finite nonnegative number for {case_id}")
         latencies[case_id] = latency
-    if set(predictions) != {case["id"] for case in cases}:
-        parser.error("predictions must contain exactly one row per case")
+    expected_ids = {case["id"] for case in cases}
+    if set(predictions) != expected_ids:
+        details = []
+        if missing := expected_ids - set(predictions):
+            details.append(f"missing case IDs: {', '.join(sorted(missing))}")
+        if unexpected := set(predictions) - expected_ids:
+            details.append(f"unexpected case IDs: {', '.join(sorted(unexpected))}")
+        parser.error("predictions must contain exactly one row per case; " + "; ".join(details))
     case_ids = {(case["tenant"], case["question"]): case["id"] for case in cases}
     if len(case_ids) != len(cases):
         parser.error("CLI cases must have unique tenant/question pairs")

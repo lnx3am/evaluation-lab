@@ -517,9 +517,14 @@ def test_cli_rejects_malformed_prediction_rows(tmp_path, monkeypatch, capsys, pr
     assert not trace.exists()
 
 
-@pytest.mark.parametrize("prediction_ids", [[], ["other"], ["one", "other"]])
+@pytest.mark.parametrize("prediction_ids,details", [
+    ([], "missing case IDs: one"),
+    (["other"], "missing case IDs: one; unexpected case IDs: other"),
+    (["one", "other"], "unexpected case IDs: other"),
+    (["z-extra", "a-extra"], "missing case IDs: one; unexpected case IDs: a-extra, z-extra"),
+])
 def test_cli_prediction_case_mismatch_is_usage_error_without_output(
-    tmp_path, monkeypatch, capsys, prediction_ids,
+    tmp_path, monkeypatch, capsys, prediction_ids, details,
 ):
     from evaluation_lab.evaluate import main
 
@@ -539,7 +544,7 @@ def test_cli_prediction_case_mismatch_is_usage_error_without_output(
     assert exc.value.code == 2
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "predictions must contain exactly one row per case" in captured.err
+    assert f"predictions must contain exactly one row per case; {details}" in captured.err
     assert "Traceback" not in captured.err
     assert not trace.exists()
 
