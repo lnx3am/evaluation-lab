@@ -10,7 +10,7 @@ from .evaluate import _validate_cases
 
 
 def terms(text: str) -> set[str]:
-    return set(re.findall(r"[a-z0-9]+", text.lower()))
+    return set(re.findall(r"[^\W_]+", text.lower()))
 
 
 def main() -> None:

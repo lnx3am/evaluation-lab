@@ -1,4 +1,5 @@
 """Keep the documented baseline and its labeled fixture IDs in sync."""
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -7,6 +8,39 @@ import pytest
 
 from evaluation_lab import seed
 from evaluation_lab.evaluate import main as evaluate_main
+
+
+@pytest.mark.parametrize("word", ["迁移", "راهنما", "ΟΔΗΓΟΣ", "café"])
+def test_seed_matches_unicode_words_without_matching_ascii_fragments(
+    tmp_path, monkeypatch, capsys, word,
+):
+    root = tmp_path / "evaluation_lab"
+    fixtures = root / "fixtures"
+    fixtures.mkdir(parents=True)
+    (fixtures / "guide.md").write_text(word, encoding="utf-8")
+    chunk_id = hashlib.sha256(b"demo:guide.md:0").hexdigest()[:20]
+    cases = [
+        {"id": "unicode", "tenant": "demo", "question": word.lower(),
+         "relevant_ids": [chunk_id]},
+        {"id": "fragment", "tenant": "demo", "question": "caf", "relevant_ids": []},
+        {"id": "other-tenant", "tenant": "other", "question": word, "relevant_ids": []},
+    ]
+    (root / "cases.json").write_text(json.dumps(cases), encoding="utf-8")
+    monkeypatch.setattr(seed, "__file__", str(root / "seed.py"))
+    output = tmp_path / "predictions.jsonl"
+    monkeypatch.setattr("sys.argv", ["seed", "--out", str(output)])
+    seed.main()
+    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    assert rows[0]["hits"] == [{"id": chunk_id, "tenant": "demo"}]
+    assert rows[1]["hits"] == []
+    assert rows[2]["hits"] == []
+    capsys.readouterr()
+    monkeypatch.setattr("sys.argv", ["evaluate", "--cases", str(root / "cases.json"),
+                                    "--predictions", str(output), "--min-recall", "1"])
+    evaluate_main()
+    report = json.loads(capsys.readouterr().out)
+    assert report["mean_recall_at_5"] == 1
+    assert report["tenant_safe"] is True
 
 
 @pytest.mark.parametrize("cases", [[], {}, [{"id": "broken"}], [{
