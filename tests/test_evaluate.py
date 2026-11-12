@@ -245,6 +245,37 @@ def test_gate_and_tenant_safety():
     assert unsafe["mean_recall_at_5"] == 0
 
 
+def test_cli_fails_tenant_gate_for_leak_beyond_scoring_cutoff(tmp_path, monkeypatch, capsys):
+    from evaluation_lab.evaluate import main
+
+    cases = tmp_path / "cases.json"
+    cases.write_text(json.dumps([{
+        "id": "one", "tenant": "demo", "question": "handoff", "relevant_ids": ["a"],
+    }]), encoding="utf-8")
+    hits = [{"id": key, "tenant": "demo"} for key in ["a", "b", "c", "d", "e"]]
+    hits.append({"id": "private", "tenant": "other"})
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text(json.dumps({"case_id": "one", "hits": hits}) + "\n",
+                           encoding="utf-8")
+    trace = tmp_path / "traces.jsonl"
+    monkeypatch.setattr("sys.argv", ["evaluate", "--cases", str(cases),
+                                    "--predictions", str(predictions), "--trace-file", str(trace)])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    report = json.loads(captured.out)
+    assert report["mean_recall_at_5"] == 1
+    assert report["mean_reciprocal_rank"] == 1
+    assert report["tenant_safe"] is False
+    assert report["cases"][0]["tenant_safe"] is False
+    span = json.loads(trace.read_text(encoding="utf-8"))
+    assert span["case_id"] == "one"
+    assert span["tenant_safe"] is False
+    assert "private" not in trace.read_text(encoding="utf-8")
+
+
 def test_reciprocal_rank_preserves_foreign_tenant_positions():
     cases = [{"id": "one", "tenant": "demo", "question": "handoff", "relevant_ids": ["a"]}]
     hits = [{"id": "a", "tenant": "other"}, {"id": "a", "tenant": "demo"}]
