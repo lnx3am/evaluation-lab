@@ -5,6 +5,18 @@ import pytest
 from evaluation_lab.evaluate import citation_check, evaluate
 
 
+def test_duplicate_hits_do_not_inflate_recall_or_extend_top_five():
+    case = {"id": "duplicates", "tenant": "demo", "question": "incident response",
+            "relevant_ids": ["first", "second"]}
+    hits = [{"id": "first", "tenant": "demo"}] * 5 + [{"id": "second", "tenant": "demo"}]
+    report = evaluate([case], lambda tenant, question: hits)
+    row = report["cases"][0]
+    assert row["hit_at_5"] is True
+    assert row["recall_at_5"] == report["mean_recall_at_5"] == 0.5
+    assert row["reciprocal_rank"] == report["mean_reciprocal_rank"] == 1
+    assert report["tenant_safe"] is True
+
+
 def test_cli_malformed_hits_identify_prediction_line_and_case(tmp_path, monkeypatch, capsys):
     from evaluation_lab.evaluate import main
 
