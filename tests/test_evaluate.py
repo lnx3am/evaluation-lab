@@ -299,20 +299,27 @@ def test_malformed_hits_cannot_pass_unanswerable_case(hits):
         evaluate(cases, lambda tenant, question: hits)
 
 
-def test_cli_rejects_string_hits_without_report_or_traces(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("hits", ["", None, {}, [None], [{}],
+                                 [{"id": "a", "tenant": " "}]])
+def test_cli_rejects_malformed_hits_without_report_or_traces(tmp_path, monkeypatch, capsys, hits):
     from evaluation_lab.evaluate import main
 
     cases = tmp_path / "cases.json"
     cases.write_text(json.dumps([{"id": "one", "tenant": "demo", "question": "unknown",
                                  "relevant_ids": []}]))
     predictions = tmp_path / "predictions.jsonl"
-    predictions.write_text(json.dumps({"case_id": "one", "hits": ""}) + "\n")
+    predictions.write_text(json.dumps({"case_id": "one", "hits": hits}) + "\n")
     trace = tmp_path / "traces.jsonl"
     monkeypatch.setattr("sys.argv", ["evaluate", "--cases", str(cases),
                                     "--predictions", str(predictions), "--trace-file", str(trace)])
-    with pytest.raises(ValueError, match="hits must be a list of objects"):
+    with pytest.raises(SystemExit) as exc:
         main()
-    assert capsys.readouterr().out == ""
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "hits must be a list of objects" in captured.err
+    assert str(predictions) in captured.err
+    assert "line 1, case one" in captured.err
     assert not trace.exists()
 
 
