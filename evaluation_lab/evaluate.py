@@ -62,7 +62,8 @@ def _validate_cases(cases: list[dict]) -> None:
 def evaluate(cases: list[dict], retrieve: Callable[[str, str], list[dict]]) -> dict:
     _validate_cases(cases)
     rows = [score_case(case, retrieve) for case in cases]
-    return {"cases": rows, "mean_recall_at_5": sum(r["recall_at_5"] for r in rows) / len(rows),
+    return {"cases": rows, "mean_hit_at_5": sum(r["hit_at_5"] for r in rows) / len(rows),
+            "mean_recall_at_5": sum(r["recall_at_5"] for r in rows) / len(rows),
             "mean_reciprocal_rank": sum(r["reciprocal_rank"] for r in rows) / len(rows),
             "tenant_safe": all(r["tenant_safe"] for r in rows)}
 

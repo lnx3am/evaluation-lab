@@ -26,6 +26,7 @@ def test_bundled_baseline_passes_release_gate_and_writes_redacted_traces(
                                     "--min-recall", "1", "--trace-file", str(traces)])
     evaluate_main()
     report = json.loads(capsys.readouterr().out)
+    assert report["mean_hit_at_5"] == 1
     assert report["mean_recall_at_5"] == 1
     assert report["mean_reciprocal_rank"] == 1
     assert report["tenant_safe"] is True

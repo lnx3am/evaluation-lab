@@ -5,6 +5,23 @@ import pytest
 from evaluation_lab.evaluate import citation_check, evaluate
 
 
+@pytest.mark.parametrize("negative_hits,hit_rate,recall", [
+    ([], 2 / 3, 0.5), ([{"id": "noise", "tenant": "demo"}], 1 / 3, 1 / 6),
+])
+def test_aggregate_hit_rate_counts_cases_including_unanswerable_cases(negative_hits, hit_rate, recall):
+    cases = [
+        {"id": "partial", "tenant": "demo", "question": "handoff", "relevant_ids": ["a", "b"]},
+        {"id": "miss", "tenant": "demo", "question": "rollback", "relevant_ids": ["c"]},
+        {"id": "negative", "tenant": "demo", "question": "unknown", "relevant_ids": []},
+    ]
+    predictions = {"handoff": [{"id": "a", "tenant": "demo"}],
+                   "rollback": [], "unknown": negative_hits}
+    report = evaluate(cases, lambda tenant, question: predictions[question])
+    assert [row["hit_at_5"] for row in report["cases"]] == [True, False, not negative_hits]
+    assert report["mean_hit_at_5"] == pytest.approx(hit_rate)
+    assert report["mean_recall_at_5"] == pytest.approx(recall)
+
+
 @pytest.mark.parametrize("input_file", ["cases", "predictions"])
 @pytest.mark.parametrize("problem", ["missing", "directory", "invalid_utf8", "invalid_json"])
 def test_cli_input_file_errors_are_usage_errors_without_output(

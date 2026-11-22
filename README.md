@@ -12,6 +12,11 @@ RAG changes are hard to review without a stable dataset and a release gate. This
 
 ## Run and example
 
+Reports include `mean_hit_at_5`, the fraction of cases with at least one relevant hit in the
+first five results. An unanswerable case passes this metric only when it returns no hits,
+matching the per-case `hit_at_5` rule. This complements `mean_recall_at_5`, which measures
+how many relevant chunks were found. The release gate still uses recall and tenant safety.
+
 From this repository after `python -m pip install -e ".[dev]"`:
 
 ```bash
