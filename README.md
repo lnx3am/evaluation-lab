@@ -28,6 +28,7 @@ The seed command runs a simple lexical baseline over the included fixture docume
 
 Case and prediction files use UTF-8. Missing or unreadable files and invalid JSON produce CLI usage errors (exit 2) before writing a report or traces; malformed prediction JSON and rows missing a valid case ID or hits include their line number.
 Duplicate prediction rows also produce a CLI usage error with the duplicate case ID and line number.
+Missing or unexpected case IDs produce a CLI usage error (exit 2) identifying the predictions file, without writing a report or changing traces.
 
 `hits` must be a list of objects with nonblank string `id` and `tenant` fields; use `[]` for no results. Malformed hits are rejected before a report or traces are written.
 

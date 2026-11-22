@@ -387,3 +387,32 @@ def test_cli_rejects_malformed_prediction_rows(tmp_path, monkeypatch, capsys, pr
     assert "prediction rows need a nonblank string case_id and hits" in captured.err
     assert "Traceback" not in captured.err
     assert not trace.exists()
+
+
+@pytest.mark.parametrize("prediction_ids", [[], ["other"], ["one", "other"]])
+def test_cli_prediction_coverage_errors_are_usage_errors_without_output(
+    tmp_path, monkeypatch, capsys, prediction_ids,
+):
+    from evaluation_lab.evaluate import main
+
+    cases = tmp_path / "cases.json"
+    cases.write_text(json.dumps([{
+        "id": "one", "tenant": "demo", "question": "unknown", "relevant_ids": [],
+    }]), encoding="utf-8")
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text("".join(
+        json.dumps({"case_id": case_id, "hits": []}) + "\n" for case_id in prediction_ids
+    ), encoding="utf-8")
+    trace = tmp_path / "traces.jsonl"
+    trace.write_text("existing trace\n", encoding="utf-8")
+    monkeypatch.setattr("sys.argv", ["evaluate", "--cases", str(cases),
+                                    "--predictions", str(predictions), "--trace-file", str(trace)])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert str(predictions) in captured.err
+    assert "predictions must contain exactly one row per case" in captured.err
+    assert "Traceback" not in captured.err
+    assert trace.read_text(encoding="utf-8") == "existing trace\n"

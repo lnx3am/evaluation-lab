@@ -115,7 +115,8 @@ def main() -> None:
                          f"latency_ms must be a finite nonnegative number for {case_id}")
         latencies[case_id] = latency
     if set(predictions) != {case["id"] for case in cases}:
-        raise ValueError("predictions must contain exactly one row per case")
+        parser.error(f"invalid predictions file {args.predictions}: "
+                     "predictions must contain exactly one row per case")
     case_ids = {(case["tenant"], case["question"]): case["id"] for case in cases}
     if len(case_ids) != len(cases):
         raise ValueError("CLI cases must have unique tenant/question pairs")
