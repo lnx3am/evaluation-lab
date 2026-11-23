@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from evaluation_lab import seed
 from evaluation_lab.evaluate import main as evaluate_main
 
@@ -37,3 +39,39 @@ def test_bundled_baseline_passes_release_gate_and_writes_redacted_traces(
         assert span["latency_ms"] == row["latency_ms"]
         assert set(span) == {"trace_id", "event", "case_id", "latency_ms",
                              "recall_at_5", "tenant_safe"}
+
+
+@pytest.mark.parametrize("failure", ["directory", "missing_parent", "write"])
+def test_output_failure_is_usage_error_without_success_message(
+    tmp_path, monkeypatch, capsys, failure,
+):
+    path = tmp_path / "predictions.jsonl"
+    if failure == "directory":
+        path.mkdir()
+    elif failure == "missing_parent":
+        path = tmp_path / "missing" / "predictions.jsonl"
+    else:
+        from contextlib import contextmanager
+
+        original_open = Path.open
+
+        @contextmanager
+        def failing_open(self, *args, **kwargs):
+            if self == path:
+                class FullDisk:
+                    def write(self, text):
+                        raise OSError("disk full")
+                yield FullDisk()
+            else:
+                with original_open(self, *args, **kwargs) as handle:
+                    yield handle
+
+        monkeypatch.setattr(Path, "open", failing_open)
+    monkeypatch.setattr("sys.argv", ["seed", "--out", str(path)])
+    with pytest.raises(SystemExit) as exc:
+        seed.main()
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"cannot write predictions file {path}" in captured.err
+    assert "Traceback" not in captured.err
