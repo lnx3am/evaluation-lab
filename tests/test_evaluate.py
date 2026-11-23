@@ -5,6 +5,38 @@ import pytest
 from evaluation_lab.evaluate import citation_check, evaluate
 
 
+@pytest.mark.parametrize("problem", ["directory", "missing_parent", "write"])
+def test_cli_trace_write_failure_is_usage_error(tmp_path, monkeypatch, capsys, problem):
+    from pathlib import Path
+    from unittest.mock import MagicMock
+
+    from evaluation_lab.evaluate import main
+
+    cases = tmp_path / "cases.json"
+    cases.write_text(json.dumps([{
+        "id": "one", "tenant": "demo", "question": "unknown", "relevant_ids": [],
+    }]), encoding="utf-8")
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text('{"case_id": "one", "hits": []}\n', encoding="utf-8")
+    trace = tmp_path if problem == "directory" else tmp_path / "missing" / "traces.jsonl"
+    if problem == "write":
+        trace = tmp_path / "traces.jsonl"
+        open_path = Path.open
+        handle = MagicMock()
+        handle.__enter__.return_value.write.side_effect = OSError("trace storage unavailable")
+        monkeypatch.setattr(Path, "open", lambda path, *args, **kwargs:
+                            handle if path == trace else open_path(path, *args, **kwargs))
+    monkeypatch.setattr("sys.argv", ["evaluate", "--cases", str(cases),
+                                    "--predictions", str(predictions), "--trace-file", str(trace)])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"cannot write trace file {trace}" in captured.err
+    assert "Traceback" not in captured.err
+
+
 @pytest.mark.parametrize("negative_hits,hit_rate,recall", [
     ([], 2 / 3, 0.5), ([{"id": "noise", "tenant": "demo"}], 1 / 3, 1 / 6),
 ])

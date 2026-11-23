@@ -27,6 +27,7 @@ python -m evaluation_lab.evaluate --predictions predictions.jsonl --min-recall 0
 The seed command runs a simple lexical baseline over the included fixture documents and writes one prediction per labeled case. Replace that file with output from your own retriever to compare systems; keep the same chunk IDs and tenant fields. The evaluation output is JSON suitable for CI. Tests live in `tests/test_evaluate.py`.
 
 Case and prediction files use UTF-8. Missing or unreadable files and invalid JSON produce CLI usage errors (exit 2) before writing a report or traces; malformed prediction JSON and rows missing a valid case ID or hits include their line number.
+Trace output uses UTF-8. If a requested trace file cannot be opened or written, the CLI reports a usage error (exit 2) identifying the path before printing a report.
 Duplicate prediction rows also produce a CLI usage error with the duplicate case ID and line number.
 Missing or unexpected case IDs produce a CLI usage error (exit 2) identifying the predictions file, without writing a report or changing traces.
 
