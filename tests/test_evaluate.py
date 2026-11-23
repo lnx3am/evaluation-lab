@@ -209,7 +209,10 @@ def test_invalid_relevance_labels_are_rejected_before_retrieval(labels):
         evaluate(cases, unexpected_retrieval)
 
 
-def test_cli_rejects_ambiguous_case_lookup_without_writing_traces(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("predictions_exist", [False, True])
+def test_cli_rejects_ambiguous_case_lookup_without_writing_traces(
+    tmp_path, monkeypatch, capsys, predictions_exist,
+):
     from evaluation_lab.evaluate import main
 
     cases = tmp_path / "cases.json"
@@ -219,17 +222,25 @@ def test_cli_rejects_ambiguous_case_lookup_without_writing_traces(tmp_path, monk
     ]))
     predictions = tmp_path / "predictions.jsonl"
     # Reusing the second prediction would falsely give both cases perfect recall.
-    predictions.write_text("\n".join(json.dumps(row) for row in [
-        {"case_id": "one", "hits": []},
-        {"case_id": "two", "hits": [{"id": "a", "tenant": "demo"}]},
-    ]) + "\n")
+    if predictions_exist:
+        predictions.write_text("\n".join(json.dumps(row) for row in [
+            {"case_id": "one", "hits": []},
+            {"case_id": "two", "hits": [{"id": "a", "tenant": "demo"}]},
+        ]) + "\n")
     trace = tmp_path / "traces.jsonl"
+    trace.write_text("existing trace\n", encoding="utf-8")
     monkeypatch.setattr("sys.argv", ["evaluate", "--cases", str(cases),
                                     "--predictions", str(predictions), "--trace-file", str(trace)])
-    with pytest.raises(ValueError, match="unique tenant/question pairs"):
+    with pytest.raises(SystemExit) as exc:
         main()
-    assert capsys.readouterr().out == ""
-    assert not trace.exists()
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert str(cases) in captured.err
+    assert "unique tenant/question pairs" in captured.err
+    assert "cannot read predictions" not in captured.err
+    assert "Traceback" not in captured.err
+    assert trace.read_text(encoding="utf-8") == "existing trace\n"
 
 
 @pytest.mark.parametrize("latency", [-1, float("nan"), float("inf"), -float("inf"),

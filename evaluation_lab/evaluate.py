@@ -87,6 +87,9 @@ def main() -> None:
         parser.error(f"cannot read cases file {args.cases}: {exc}")
     try:
         _validate_cases(cases)
+        case_ids = {(case["tenant"], case["question"]): case["id"] for case in cases}
+        if len(case_ids) != len(cases):
+            raise ValueError("CLI cases must have unique tenant/question pairs")
     except ValueError as exc:
         parser.error(f"invalid cases file {args.cases}: {exc}")
     predictions = {}
@@ -125,9 +128,6 @@ def main() -> None:
     if set(predictions) != {case["id"] for case in cases}:
         parser.error(f"invalid predictions file {args.predictions}: "
                      "predictions must contain exactly one row per case")
-    case_ids = {(case["tenant"], case["question"]): case["id"] for case in cases}
-    if len(case_ids) != len(cases):
-        raise ValueError("CLI cases must have unique tenant/question pairs")
     report = evaluate(cases, lambda tenant, question: predictions[case_ids[tenant, question]])
     for row in report["cases"]:
         row["latency_ms"] = latencies[row["case"]]
