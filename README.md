@@ -30,7 +30,7 @@ Case and prediction files use UTF-8. Missing or unreadable files and invalid JSO
 Duplicate prediction rows also produce a CLI usage error with the duplicate case ID and line number.
 Missing or unexpected case IDs produce a CLI usage error (exit 2) identifying the predictions file, without writing a report or changing traces.
 
-`hits` must be a list of objects with nonblank string `id` and `tenant` fields; use `[]` for no results. Malformed hits are rejected before a report or traces are written.
+`hits` must be a list of objects with nonblank string `id` and `tenant` fields; use `[]` for no results. Malformed hits produce CLI usage errors (exit 2) identifying the prediction line and case, before a report or traces are written.
 
 Cases must be a nonempty JSON list of objects with relevance labels. Malformed containers are rejected before retrieval.
 Invalid case definitions produce CLI usage errors (exit 2), including the cases file path and validation reason, before reading predictions or writing traces.
