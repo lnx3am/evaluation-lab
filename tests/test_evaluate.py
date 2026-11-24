@@ -276,7 +276,7 @@ def test_cli_rejects_ambiguous_case_lookup_without_writing_traces(
 
 
 @pytest.mark.parametrize("latency", [-1, float("nan"), float("inf"), -float("inf"),
-                                   "12", True])
+                                   "12", True, -(10**400)])
 def test_cli_rejects_invalid_latency_without_writing_traces(tmp_path, monkeypatch, capsys, latency):
     from evaluation_lab.evaluate import main
 
@@ -298,7 +298,7 @@ def test_cli_rejects_invalid_latency_without_writing_traces(tmp_path, monkeypatc
     assert not trace.exists()
 
 
-@pytest.mark.parametrize("latency", [None, 0, 12.5])
+@pytest.mark.parametrize("latency", [None, 0, 12.5, 10**400])
 def test_cli_preserves_valid_optional_latency(tmp_path, monkeypatch, capsys, latency):
     from evaluation_lab.evaluate import main
 
