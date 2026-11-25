@@ -9,6 +9,33 @@ from evaluation_lab import seed
 from evaluation_lab.evaluate import main as evaluate_main
 
 
+@pytest.mark.parametrize("missing", ["one", "directory", "empty"])
+def test_missing_labeled_fixtures_preserve_predictions(tmp_path, monkeypatch, capsys, missing):
+    bundled = Path(seed.__file__).parent
+    root = tmp_path / "evaluation_lab"
+    shutil.copytree(bundled / "fixtures", root / "fixtures")
+    shutil.copyfile(bundled / "cases.json", root / "cases.json")
+    if missing == "one":
+        (root / "fixtures" / "oncall.md").unlink()
+    elif missing == "directory":
+        shutil.rmtree(root / "fixtures")
+    else:
+        for fixture in (root / "fixtures").glob("*.md"):
+            fixture.unlink()
+    monkeypatch.setattr(seed, "__file__", str(root / "seed.py"))
+    output = tmp_path / "predictions.jsonl"
+    output.write_bytes(b"existing predictions\n")
+    monkeypatch.setattr("sys.argv", ["seed", "--out", str(output)])
+    with pytest.raises(SystemExit) as exc:
+        seed.main()
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "seed corpus is missing labeled chunks" in captured.err
+    assert "a1e608f365be6cb57c23" in captured.err
+    assert output.read_bytes() == b"existing predictions\n"
+
+
 @pytest.mark.parametrize("invalid", [None, {}, [], [None], [
     {"id": "invalid", "tenant": "demo", "relevant_ids": []},
 ]])

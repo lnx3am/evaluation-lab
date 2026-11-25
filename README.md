@@ -30,6 +30,7 @@ The seed command writes UTF-8 predictions to a temporary file beside the destina
 The seed command rejects output paths that refer to its cases file or fixture documents, including symbolic and hard links, before overwriting any input.
 Seed inputs are read as UTF-8. Unreadable inputs, invalid text encoding, and malformed cases JSON produce CLI usage errors (exit 2) naming the input, before opening or changing the predictions output.
 The seed command also validates case definitions with the evaluator's schema before opening the output. Invalid or empty case sets produce a usage error (exit 2) and preserve existing predictions.
+Every labeled chunk must exist in the seed corpus under the expected tenant. Missing or renamed fixtures produce a usage error (exit 2) listing the missing labels and preserve existing predictions.
 
 Case and prediction files use UTF-8. Missing or unreadable files and invalid JSON produce CLI usage errors (exit 2) before writing a report or traces; malformed prediction JSON and rows missing a valid case ID or hits include their line number.
 Trace output uses UTF-8. If a requested trace file cannot be opened or written, the CLI reports a usage error (exit 2) identifying the path before printing a report.

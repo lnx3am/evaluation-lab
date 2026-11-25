@@ -38,6 +38,11 @@ def main() -> None:
             parser.error(f"cannot read seed input {path}: {exc}")
         documents.append({"id": key, "tenant": "demo", "text": text})
     documents.append({"id": "private-other-tenant", "tenant": "other", "text": "Private migration plan"})
+    available = {(doc["tenant"], doc["id"]) for doc in documents}
+    missing = sorted({(case["tenant"], key) for case in cases for key in case["relevant_ids"]}
+                     - available)
+    if missing:
+        parser.error(f"seed corpus is missing labeled chunks: {missing}")
     try:
         output_path = Path(args.out).resolve()
         if output_path.exists() and any(
