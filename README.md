@@ -26,7 +26,7 @@ python -m evaluation_lab.evaluate --predictions predictions.jsonl --min-recall 0
 
 The seed command runs a simple lexical baseline over the included fixture documents and writes one prediction per labeled case. Replace that file with output from your own retriever to compare systems; keep the same chunk IDs and tenant fields. The evaluation output is JSON suitable for CI. Tests live in `tests/test_evaluate.py`.
 
-If the seed command cannot open or write its predictions output, it reports a CLI usage error (exit 2) naming the file and does not print a success message. A failed write may leave a partial output file; rerun the seed command after resolving the error.
+The seed command writes UTF-8 predictions to a temporary file beside the destination, then replaces the destination only after the complete file closes successfully. Write or replacement failures report a CLI usage error (exit 2) naming the output, preserve existing predictions, clean up temporary files, and do not print a success message.
 The seed command rejects output paths that refer to its cases file or fixture documents, including symbolic and hard links, before overwriting any input.
 Seed inputs are read as UTF-8. Unreadable inputs, invalid text encoding, and malformed cases JSON produce CLI usage errors (exit 2) naming the input, before opening or changing the predictions output.
 The seed command also validates case definitions with the evaluator's schema before opening the output. Invalid or empty case sets produce a usage error (exit 2) and preserve existing predictions.

@@ -102,9 +102,11 @@ def test_bundled_baseline_passes_release_gate_and_writes_redacted_traces(
 ):
     predictions = tmp_path / "predictions.jsonl"
     traces = tmp_path / "traces.jsonl"
+    predictions.write_bytes(b"existing predictions\n")
     monkeypatch.setattr("sys.argv", ["seed", "--out", str(predictions)])
     seed.main()
     capsys.readouterr()
+    assert list(tmp_path.iterdir()) == [predictions]
     cases = json.loads(Path(seed.__file__).with_name("cases.json").read_text())
     rows = [json.loads(line) for line in predictions.read_text().splitlines()]
     assert [row["case_id"] for row in rows] == [case["id"] for case in cases]
@@ -130,7 +132,22 @@ def test_bundled_baseline_passes_release_gate_and_writes_redacted_traces(
                              "recall_at_5", "tenant_safe"}
 
 
-@pytest.mark.parametrize("failure", ["directory", "missing_parent", "write"])
+def test_seed_replaces_symlink_target_without_removing_link(tmp_path, monkeypatch, capsys):
+    target = tmp_path / "predictions.jsonl"
+    target.write_bytes(b"existing predictions\n")
+    output = tmp_path / "latest.jsonl"
+    output.symlink_to(target)
+    monkeypatch.setattr("sys.argv", ["seed", "--out", str(output)])
+    seed.main()
+    assert output.is_symlink()
+    assert output.read_bytes() == target.read_bytes()
+    rows = [json.loads(line) for line in target.read_text().splitlines()]
+    assert len(rows) == 6
+    assert sorted(tmp_path.iterdir()) == [output, target]
+    assert "Wrote 6 cases" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("failure", ["directory", "missing_parent", "write", "replace"])
 def test_output_failure_is_usage_error_without_success_message(
     tmp_path, monkeypatch, capsys, failure,
 ):
@@ -139,18 +156,28 @@ def test_output_failure_is_usage_error_without_success_message(
         path.mkdir()
     elif failure == "missing_parent":
         path = tmp_path / "missing" / "predictions.jsonl"
+    elif failure == "replace":
+        path.write_bytes(b"existing predictions\n")
+
+        def failing_replace(self, target):
+            raise OSError("cannot replace predictions")
+
+        monkeypatch.setattr(Path, "replace", failing_replace)
     else:
         from contextlib import contextmanager
 
         original_open = Path.open
+        path.write_bytes(b"existing predictions\n")
 
         @contextmanager
         def failing_open(self, *args, **kwargs):
-            if self == path:
-                class FullDisk:
-                    def write(self, text):
-                        raise OSError("disk full")
-                yield FullDisk()
+            if self.name == path.name and "w" in args:
+                with original_open(self, *args, **kwargs) as handle:
+                    class FullDisk:
+                        def write(self, text):
+                            handle.write(text)
+                            raise OSError("disk full")
+                    yield FullDisk()
             else:
                 with original_open(self, *args, **kwargs) as handle:
                     yield handle
@@ -164,3 +191,6 @@ def test_output_failure_is_usage_error_without_success_message(
     assert captured.out == ""
     assert f"cannot write predictions file {path}" in captured.err
     assert "Traceback" not in captured.err
+    if failure in ("write", "replace"):
+        assert path.read_bytes() == b"existing predictions\n"
+        assert list(tmp_path.iterdir()) == [path]
