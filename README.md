@@ -30,6 +30,7 @@ If the seed command cannot open or write its predictions output, it reports a CL
 
 Case and prediction files use UTF-8. Missing or unreadable files and invalid JSON produce CLI usage errors (exit 2) before writing a report or traces; malformed prediction JSON and rows missing a valid case ID or hits include their line number.
 Trace output uses UTF-8. If a requested trace file cannot be opened or written, the CLI reports a usage error (exit 2) identifying the path before printing a report.
+The trace destination must differ from both input files, including symlink and hard-link aliases; conflicting destinations are rejected before appending any spans.
 Duplicate prediction rows also produce a CLI usage error with the duplicate case ID and line number.
 Missing or unexpected case IDs produce a CLI usage error (exit 2) identifying the predictions file, without writing a report or changing traces.
 

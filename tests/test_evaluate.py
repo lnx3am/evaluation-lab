@@ -469,3 +469,34 @@ def test_cli_prediction_coverage_errors_are_usage_errors_without_output(
     assert "predictions must contain exactly one row per case" in captured.err
     assert "Traceback" not in captured.err
     assert trace.read_text(encoding="utf-8") == "existing trace\n"
+
+
+@pytest.mark.parametrize("input_name", ["cases", "predictions"])
+@pytest.mark.parametrize("alias", ["direct", "symlink", "hardlink"])
+def test_trace_destination_cannot_modify_inputs(
+    tmp_path, monkeypatch, capsys, input_name, alias,
+):
+    from evaluation_lab.evaluate import main
+
+    cases = tmp_path / "cases.json"
+    cases.write_text(json.dumps([{
+        "id": "one", "tenant": "demo", "question": "unknown", "relevant_ids": [],
+    }]), encoding="utf-8")
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text('{"case_id": "one", "hits": []}\n', encoding="utf-8")
+    before = {path: path.read_bytes() for path in (cases, predictions)}
+    source = cases if input_name == "cases" else predictions
+    trace = source if alias == "direct" else tmp_path / "traces.jsonl"
+    if alias == "symlink":
+        trace.symlink_to(source)
+    elif alias == "hardlink":
+        trace.hardlink_to(source)
+    monkeypatch.setattr("sys.argv", ["evaluate", "--cases", str(cases),
+                                    "--predictions", str(predictions), "--trace-file", str(trace)])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "trace file must differ from cases and predictions files" in captured.err
+    assert all(path.read_bytes() == contents for path, contents in before.items())
