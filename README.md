@@ -28,6 +28,7 @@ The seed command runs a simple lexical baseline over the included fixture docume
 
 If the seed command cannot open or write its predictions output, it reports a CLI usage error (exit 2) naming the file and does not print a success message. A failed write may leave a partial output file; rerun the seed command after resolving the error.
 The seed command rejects output paths that refer to its cases file or fixture documents, including symbolic and hard links, before overwriting any input.
+Seed inputs are read as UTF-8. Unreadable inputs, invalid text encoding, and malformed cases JSON produce CLI usage errors (exit 2) naming the input, before opening or changing the predictions output.
 
 Case and prediction files use UTF-8. Missing or unreadable files and invalid JSON produce CLI usage errors (exit 2) before writing a report or traces; malformed prediction JSON and rows missing a valid case ID or hits include their line number.
 Trace output uses UTF-8. If a requested trace file cannot be opened or written, the CLI reports a usage error (exit 2) identifying the path before printing a report.

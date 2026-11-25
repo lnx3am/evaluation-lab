@@ -18,11 +18,18 @@ def main() -> None:
     root = Path(__file__).parent
     cases_path = root / "cases.json"
     fixture_paths = sorted((root / "fixtures").glob("*.md"))
-    cases = json.loads(cases_path.read_text())
+    try:
+        cases = json.loads(cases_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        parser.error(f"cannot read seed input {cases_path}: {exc}")
     documents = []
     for path in fixture_paths:
         key = hashlib.sha256(f"demo:{path.name}:0".encode()).hexdigest()[:20]
-        documents.append({"id": key, "tenant": "demo", "text": path.read_text()})
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            parser.error(f"cannot read seed input {path}: {exc}")
+        documents.append({"id": key, "tenant": "demo", "text": text})
     documents.append({"id": "private-other-tenant", "tenant": "other", "text": "Private migration plan"})
     try:
         output_path = Path(args.out)

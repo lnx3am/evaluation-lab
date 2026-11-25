@@ -9,6 +9,38 @@ from evaluation_lab import seed
 from evaluation_lab.evaluate import main as evaluate_main
 
 
+@pytest.mark.parametrize("failure", ["missing_cases", "invalid_json", "invalid_fixture_encoding"])
+def test_input_failure_is_usage_error_without_changing_predictions(
+    tmp_path, monkeypatch, capsys, failure,
+):
+    bundled = Path(seed.__file__).parent
+    root = tmp_path / "evaluation_lab"
+    shutil.copytree(bundled / "fixtures", root / "fixtures")
+    cases = root / "cases.json"
+    shutil.copyfile(bundled / "cases.json", cases)
+    if failure == "missing_cases":
+        cases.unlink()
+        failed_path = cases
+    elif failure == "invalid_json":
+        cases.write_text("{", encoding="utf-8")
+        failed_path = cases
+    else:
+        failed_path = root / "fixtures" / "oncall.md"
+        failed_path.write_bytes(b"\xff")
+    monkeypatch.setattr(seed, "__file__", str(root / "seed.py"))
+    output = tmp_path / "predictions.jsonl"
+    output.write_bytes(b"existing predictions\n")
+    monkeypatch.setattr("sys.argv", ["seed", "--out", str(output)])
+    with pytest.raises(SystemExit) as exc:
+        seed.main()
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"cannot read seed input {failed_path}" in captured.err
+    assert "Traceback" not in captured.err
+    assert output.read_bytes() == b"existing predictions\n"
+
+
 @pytest.mark.parametrize("input_name", ["cases.json", "fixtures/oncall.md"])
 @pytest.mark.parametrize("alias", ["direct", "symlink", "hardlink"])
 def test_seed_cannot_overwrite_its_inputs(tmp_path, monkeypatch, capsys, input_name, alias):
