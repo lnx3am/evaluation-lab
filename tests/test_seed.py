@@ -9,6 +9,35 @@ from evaluation_lab import seed
 from evaluation_lab.evaluate import main as evaluate_main
 
 
+@pytest.mark.parametrize("invalid", [None, {}, [], [None], [
+    {"id": "invalid", "tenant": "demo", "relevant_ids": []},
+]])
+def test_invalid_cases_leave_existing_predictions_unchanged(
+    tmp_path, monkeypatch, capsys, invalid,
+):
+    bundled = Path(seed.__file__).parent
+    root = tmp_path / "evaluation_lab"
+    shutil.copytree(bundled / "fixtures", root / "fixtures")
+    cases_path = root / "cases.json"
+    # Include a valid case first to catch partial output before a later failure.
+    cases = json.loads((bundled / "cases.json").read_text(encoding="utf-8"))
+    if isinstance(invalid, list) and invalid:
+        invalid = [cases[0], *invalid]
+    cases_path.write_text(json.dumps(invalid), encoding="utf-8")
+    monkeypatch.setattr(seed, "__file__", str(root / "seed.py"))
+    output = tmp_path / "predictions.jsonl"
+    output.write_bytes(b"existing predictions\n")
+    monkeypatch.setattr("sys.argv", ["seed", "--out", str(output)])
+    with pytest.raises(SystemExit) as exc:
+        seed.main()
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"invalid cases file {cases_path}:" in captured.err
+    assert "Traceback" not in captured.err
+    assert output.read_bytes() == b"existing predictions\n"
+
+
 @pytest.mark.parametrize("failure", ["missing_cases", "invalid_json", "invalid_fixture_encoding"])
 def test_input_failure_is_usage_error_without_changing_predictions(
     tmp_path, monkeypatch, capsys, failure,
