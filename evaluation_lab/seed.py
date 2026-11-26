@@ -27,6 +27,8 @@ def main() -> None:
         parser.error(f"cannot read seed input {cases_path}: {exc}")
     try:
         _validate_cases(cases)
+        if len({(case["tenant"], case["question"]) for case in cases}) != len(cases):
+            raise ValueError("CLI cases must have unique tenant/question pairs")
     except ValueError as exc:
         parser.error(f"invalid cases file {cases_path}: {exc}")
     documents = []

@@ -65,6 +65,27 @@ def test_invalid_cases_leave_existing_predictions_unchanged(
     assert output.read_bytes() == b"existing predictions\n"
 
 
+def test_ambiguous_case_queries_preserve_predictions(tmp_path, monkeypatch, capsys):
+    root = tmp_path / "evaluation_lab"
+    root.mkdir()
+    cases_path = root / "cases.json"
+    case = {"id": "one", "tenant": "demo", "question": "Any evidence?", "relevant_ids": []}
+    cases_path.write_text(json.dumps([case, {**case, "id": "two"}]), encoding="utf-8")
+    monkeypatch.setattr(seed, "__file__", str(root / "seed.py"))
+    output = tmp_path / "predictions.jsonl"
+    output.write_bytes(b"existing predictions\n")
+    monkeypatch.setattr("sys.argv", ["seed", "--out", str(output)])
+    with pytest.raises(SystemExit) as exc:
+        seed.main()
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"invalid cases file {cases_path}:" in captured.err
+    assert "unique tenant/question pairs" in captured.err
+    assert output.read_bytes() == b"existing predictions\n"
+    assert not list(tmp_path.glob(".seed-*"))
+
+
 @pytest.mark.parametrize("failure", ["missing_cases", "invalid_json", "invalid_fixture_encoding"])
 def test_input_failure_is_usage_error_without_changing_predictions(
     tmp_path, monkeypatch, capsys, failure,
