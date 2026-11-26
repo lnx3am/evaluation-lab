@@ -500,3 +500,39 @@ def test_trace_destination_cannot_modify_inputs(
     assert captured.out == ""
     assert "trace file must differ from cases and predictions files" in captured.err
     assert all(path.read_bytes() == contents for path, contents in before.items())
+
+
+@pytest.mark.parametrize("foreign_rank", [1, 6])
+def test_cli_tenant_leak_fails_gate_even_with_perfect_recall(
+    tmp_path, monkeypatch, capsys, foreign_rank,
+):
+    from evaluation_lab.evaluate import main
+
+    cases = tmp_path / "cases.json"
+    cases.write_text(json.dumps([{
+        "id": "one", "tenant": "demo", "question": "handoff", "relevant_ids": ["a"],
+    }]), encoding="utf-8")
+    hits = [{"id": "a", "tenant": "demo"}] + [
+        {"id": f"noise-{index}", "tenant": "demo"} for index in range(4)
+    ]
+    hits.insert(foreign_rank - 1, {"id": "private", "tenant": "other"})
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text(json.dumps({"case_id": "one", "hits": hits}) + "\n",
+                           encoding="utf-8")
+    trace = tmp_path / "traces.jsonl"
+    monkeypatch.setattr("sys.argv", ["evaluate", "--cases", str(cases),
+                                    "--predictions", str(predictions), "--min-recall", "1",
+                                    "--trace-file", str(trace)])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    report = json.loads(captured.out)
+    assert report["mean_recall_at_5"] == 1
+    assert report["tenant_safe"] is False
+    spans = [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines()]
+    assert len(spans) == 1
+    assert spans[0]["case_id"] == "one"
+    assert spans[0]["recall_at_5"] == 1
+    assert spans[0]["tenant_safe"] is False
